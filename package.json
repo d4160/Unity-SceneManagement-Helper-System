@@ -1,0 +1,14 @@
+{
+  "name": "d4160.scene_management-system",
+  "displayName": "Unity Scene Management Helper System",
+  "version": "0.1.0",
+  "unity": "2017.1",
+  "description": "Provide helper classes to manage scene load/unload, compatible with multiscene distribution and addressables.",
+  "keywords": [
+      "unity",
+      "scene management"
+  ],
+  "author": {
+    "name": "d4160(Maranatha2031)"
+  }
+}
