@@ -29,10 +29,8 @@
             UpdateLoop.OnUpdate += OnUpdate;
         }
 
-        protected override void OnDisable()
+        protected virtual void OnDisable()
         {
-            base.OnDisable();
-
             UpdateLoop.OnUpdate -= OnUpdate;
         }
         #endregion
@@ -41,29 +39,42 @@
         protected void OnUpdate(float deltaTime)
         {
             if (m_asyncLoadOperation != null)
+            {
+                Debug.Log($"AsyncOp allowed?{m_asyncLoadOperation.allowSceneActivation}");
                 m_onAsyncLoadOperationProgress?.Invoke(m_asyncLoadOperation.progress);
+            }
         }
         #endregion
 
         #region Load Methods
         public static void LoadScene(
-            int sceneBuildIdx, 
+            int sceneBuildIdx,
             LoadSceneMode mode = LoadSceneMode.Single)
         {
             if (!IsSceneLoadedOrInBackground(sceneBuildIdx))
             {
-                SceneManager.LoadScene(sceneBuildIdx, mode);
+                Instance.LoadSceneInternal(sceneBuildIdx, mode);
             }
         }
 
         public static void LoadScene(
-            string sceneName, 
+            string sceneName,
             LoadSceneMode mode = LoadSceneMode.Single)
         {
             if (!IsSceneLoadedOrInBackground(sceneName))
             {
-                SceneManager.LoadScene(sceneName, mode);
+                Instance.LoadSceneInternal(sceneName, mode);
             }
+        }
+
+        protected virtual void LoadSceneInternal(string sceneName, LoadSceneMode mode = LoadSceneMode.Single)
+        {
+            SceneManager.LoadScene(sceneName, mode);
+        }
+
+        protected virtual void LoadSceneInternal(int sceneBuildIdx, LoadSceneMode mode = LoadSceneMode.Single)
+        {
+            SceneManager.LoadScene(sceneBuildIdx, mode);
         }
 
         /// <summary>
@@ -74,14 +85,14 @@
         /// <param name="onComplete"></param>
         /// <param name="allowSceneActivation"></param>
         public static void ForceLoadSceneAsync(
-            int sceneBuildIdx, 
-            LoadSceneMode mode = LoadSceneMode.Single, 
-            Action<AsyncOperation> onComplete = null, 
+            int sceneBuildIdx,
+            LoadSceneMode mode = LoadSceneMode.Single,
+            Action<AsyncOperation> onComplete = null,
             bool allowSceneActivation = true)
         {
             if (!IsSceneLoadedOrInBackground(sceneBuildIdx))
             {
-                var ao = SceneManager.LoadSceneAsync(sceneBuildIdx, mode);
+                var ao = Instance.LoadSceneAsyncInternal(sceneBuildIdx, mode);
                 ao.allowSceneActivation = allowSceneActivation;
 
                 if (onComplete != null)
@@ -90,7 +101,7 @@
             else
             {
                 onComplete?.Invoke(null);
-            } 
+            }
         }
 
         /// <summary>
@@ -101,14 +112,14 @@
         /// <param name="onComplete"></param>
         /// <param name="allowSceneActivation"></param>
         public static void ForceLoadSceneAsync(
-            string sceneName, 
-            LoadSceneMode mode = LoadSceneMode.Single, 
-            Action<AsyncOperation> onComplete = null, 
+            string sceneName,
+            LoadSceneMode mode = LoadSceneMode.Single,
+            Action<AsyncOperation> onComplete = null,
             bool allowSceneActivation = true)
         {
             if (!IsSceneLoadedOrInBackground(sceneName))
             {
-                var ao = SceneManager.LoadSceneAsync(sceneName, mode);
+                var ao = Instance.LoadSceneAsyncInternal(sceneName, mode);
                 ao.allowSceneActivation = allowSceneActivation;
 
                 if (onComplete != null)
@@ -117,38 +128,50 @@
             else
             {
                 onComplete?.Invoke(null);
-            } 
+            }
+        }
+
+        protected virtual AsyncOperation LoadSceneAsyncInternal(string sceneName, LoadSceneMode mode = LoadSceneMode.Single)
+        {
+            return SceneManager.LoadSceneAsync(sceneName, mode);
+        }
+
+        protected virtual AsyncOperation LoadSceneAsyncInternal(int sceneBuildIdx, LoadSceneMode mode = LoadSceneMode.Single)
+        {
+            return SceneManager.LoadSceneAsync(sceneBuildIdx, mode);
         }
 
         public virtual bool LoadSceneAsync(
-            int sceneBuildIdx, 
+            int sceneBuildIdx,
             LoadSceneMode mode = LoadSceneMode.Single,
-            Action<AsyncOperation> onComplete = null, 
+            Action<AsyncOperation> onStarted = null,
+            Action onComplete = null,
             bool allowSceneActivation = true,
             AsyncOperationProgress onProgress = null)
         {
             if (!IsSceneLoadedOrInBackground(sceneBuildIdx))
             {
+                Debug.Log($"Try to load scene {sceneBuildIdx}. AsynOp null? {m_asyncLoadOperation == null}");
                 if (m_asyncLoadOperation == null)
                 {
-                    m_onAsyncLoadOperationHelper = null;
-
                     StartCoroutine(LoadSceneCo(sceneBuildIdx, mode));
 
-                    LoadSceneAsync(onComplete, allowSceneActivation, onProgress);
+                    LoadSceneAsync(onStarted, onComplete, allowSceneActivation, onProgress);
+
+                    m_onAsyncLoadOperationHelper = null;
 
                     return true;
                 }
                 else
                 {
                     m_onAsyncLoadOperationHelper += () => {
-                        LoadSceneAsync(sceneBuildIdx, mode, onComplete, allowSceneActivation, onProgress);
+                        LoadSceneAsync(sceneBuildIdx, mode, onStarted, onComplete, allowSceneActivation, onProgress);
                     };
                 }
             }
             else
             {
-                onComplete?.Invoke(null);
+                onComplete?.Invoke();
             }
 
             return false;
@@ -156,13 +179,14 @@
 
         protected virtual IEnumerator LoadSceneCo(int sceneBuildIdx, LoadSceneMode mode)
         {
-            yield return m_asyncLoadOperation = SceneManager.LoadSceneAsync(sceneBuildIdx, mode);
+            yield return m_asyncLoadOperation = LoadSceneAsyncInternal(sceneBuildIdx, mode);
         }
 
         public virtual bool LoadSceneAsync(
-            string sceneName, 
+            string sceneName,
             LoadSceneMode mode = LoadSceneMode.Single,
-            Action<AsyncOperation> onComplete = null, 
+            Action<AsyncOperation> onStarted = null,
+            Action onComplete = null,
             bool allowSceneActivation = true,
             AsyncOperationProgress onProgress = null)
         {
@@ -172,7 +196,7 @@
                 {
                     StartCoroutine(LoadSceneCo(sceneName, mode));
 
-                    LoadSceneAsync(onComplete, allowSceneActivation, onProgress);
+                    LoadSceneAsync(onStarted, onComplete, allowSceneActivation, onProgress);
 
                     m_onAsyncLoadOperationHelper = null;
 
@@ -181,13 +205,13 @@
                 else
                 {
                     m_onAsyncLoadOperationHelper += () => {
-                        LoadSceneAsync(sceneName, mode, onComplete, allowSceneActivation, onProgress);
+                        LoadSceneAsync(sceneName, mode, onStarted, onComplete, allowSceneActivation, onProgress);
                     };
                 }
             }
             else
             {
-                onComplete?.Invoke(null);
+                onComplete?.Invoke();
             }
 
             return false;
@@ -195,37 +219,101 @@
 
         protected virtual IEnumerator LoadSceneCo(string sceneName, LoadSceneMode mode)
         {
-            yield return m_asyncLoadOperation = SceneManager.LoadSceneAsync(sceneName, mode);
+            yield return m_asyncLoadOperation = LoadSceneAsyncInternal(sceneName, mode);
+        }
+
+        int _buildIndexTemp;
+
+        public virtual bool LoadSceneAsync(
+            int buildIndex,
+            bool setActiveAsMainScene = false,
+            Action<AsyncOperation> onStarted = null,
+            Action onCompleted = null,
+            bool allowSceneActivation = true,
+            AsyncOperationProgress onProgress = null,
+            LoadSceneMode mode = LoadSceneMode.Additive)
+        {
+            _buildIndexTemp = buildIndex;
+            Debug.Log($"Load {buildIndex} index scene as mainscene: {setActiveAsMainScene}. Allow activation: {allowSceneActivation}");
+            if (setActiveAsMainScene)
+            {
+                return LoadSceneAsync(buildIndex, mode, onStarted, () =>
+                {
+                    if (setActiveAsMainScene)
+                        SceneManagementSingleton.SetActiveScene(buildIndex);
+
+                    onCompleted?.Invoke();
+                },
+                allowSceneActivation, onProgress);
+            }
+            else
+            {
+                return LoadSceneAsync(buildIndex, mode, onStarted,
+                    () => onCompleted?.Invoke(),
+                    allowSceneActivation, onProgress);
+            }
+        }
+
+        public virtual bool LoadSceneAsync(
+            string sceneName,
+            bool setActiveAsMainScene = false,
+            Action<AsyncOperation> onStarted = null,
+            Action onCompleted = null,
+            bool allowSceneActivation = true,
+            AsyncOperationProgress onProgress = null,
+            LoadSceneMode mode = LoadSceneMode.Additive)
+        {
+            if (setActiveAsMainScene)
+            {
+                return LoadSceneAsync(sceneName, mode, onStarted, () =>
+                {
+                    if (setActiveAsMainScene)
+                        SceneManagementSingleton.SetActiveScene(sceneName);
+
+                    onCompleted?.Invoke();
+                },
+                allowSceneActivation, onProgress);
+            }
+            else
+            {
+                return LoadSceneAsync(sceneName, mode, onStarted,
+                    () => onCompleted?.Invoke(),
+                    allowSceneActivation, onProgress);
+            }
         }
 
         protected virtual void LoadSceneAsync(
-            Action<AsyncOperation> onComplete = null,
+            Action<AsyncOperation> onStarted = null,
+            Action onComplete = null,
             bool allowSceneActivation = true,
             AsyncOperationProgress onProgress = null)
         {
             m_asyncLoadOperation.allowSceneActivation = allowSceneActivation;
 
             if (onComplete != null)
-                m_asyncLoadOperation.completed += onComplete;
+            {
+                m_asyncLoadOperation.completed += (ao) =>
+                {
+                    Debug.Log($"Scene {_buildIndexTemp} is loaded.");
+                    m_asyncLoadOperation = null;
+                    m_onAsyncLoadOperationProgress = null;
+
+                    m_onAsyncLoadOperationHelper?.Invoke();
+                    onComplete.Invoke();
+                };
+            }
+
             if (onProgress != null)
                 m_onAsyncLoadOperationProgress += onProgress;
 
-            m_asyncLoadOperation.completed += OnAsyncLoadOperationCompletedCallback;
-        }
-
-        protected virtual void OnAsyncLoadOperationCompletedCallback(AsyncOperation ao)
-        {
-            m_asyncLoadOperation = null; /* complete callback */
-            m_onAsyncLoadOperationProgress = null;
-
-            m_onAsyncLoadOperationHelper?.Invoke();
+            onStarted?.Invoke(m_asyncLoadOperation);
         }
         #endregion
 
         #region Unload Methods
         public static void UnloadSceneAsync(
             int sceneBuildIdx,
-            Action<AsyncOperation> onComplete = null)
+            Action onComplete = null)
         {
             if (IsSceneLoaded(sceneBuildIdx))
             {
@@ -235,7 +323,7 @@
 
         public static void UnloadSceneAsync(
             string sceneName,
-            Action<AsyncOperation> onComplete = null)
+            Action onComplete = null)
         {
             if (IsSceneLoaded(sceneName))
             {
@@ -244,25 +332,25 @@
         }
 
         protected static IEnumerator UnloadSceneCo(
-            int sceneBuildIdx, 
-            Action<AsyncOperation> onComplete = null)
+            int sceneBuildIdx,
+            Action onComplete = null)
         {
             var ao = SceneManager.UnloadSceneAsync(sceneBuildIdx);
 
             if (onComplete != null)
-                ao.completed += onComplete;
+                ao.completed += (param) => onComplete?.Invoke();
 
             yield return ao;
         }
 
         protected static IEnumerator UnloadSceneCo(
-            string sceneName, 
-            Action<AsyncOperation> onComplete = null)
+            string sceneName,
+            Action onComplete = null)
         {
             var ao = SceneManager.UnloadSceneAsync(sceneName);
 
             if (onComplete != null)
-                ao.completed += onComplete;
+                ao.completed += (param) => onComplete?.Invoke();
 
             yield return ao;
         }
@@ -280,7 +368,7 @@
         public static void SetActiveScene(string sceneName)
         {
             var scene = GetScene(sceneName);
-            
+
             if (scene.isLoaded)
                 SetActiveScene(scene);
         }

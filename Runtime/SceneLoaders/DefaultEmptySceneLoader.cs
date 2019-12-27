@@ -2,14 +2,13 @@
 {
     using System;
     using System.Collections.Generic;
-    using UniRx.Async;
     using UnityEngine;
 
-    public class UniRxAsyncEmptySceneLoader : MonoBehaviour, IUniRxAsyncSceneLoader
+    public class DefaultEmptySceneLoader : IAsyncSceneLoader
     {
         private List<int> _loadedScenes = new List<int>();
 
-        public async UniTask LoadSceneAsync(
+        public void LoadSceneAsync(
             int buildIdx,
             bool setActiveAsMainScene = false,
             Action<AsyncOperation> onStarted = null,
@@ -25,12 +24,12 @@
             else
                 return;
 
-            await UniRxAsyncSceneManagementSingleton.LoadSceneAsync(
+            SceneManagementSingleton.Instance.LoadSceneAsync(
                 buildIdx, setActiveAsMainScene, onStarted,
                 onCompleted, allowSceneActivation, onProgress);
         }
 
-        public async UniTask UnloadSceneAsync(
+        public void UnloadSceneAsync(
             int buildIdx,
             Action onCompleted = null)
         {
@@ -42,17 +41,17 @@
 
             _loadedScenes.Remove(buildIdx);
 
-            await UniRxAsyncSceneManagementSingleton.UnloadSceneAsync(buildIdx, onCompleted);
+            SceneManagementSingleton.UnloadSceneAsync(buildIdx, onCompleted);
         }
 
-        public async UniTask UnloadAllLoadedScenes(Action onCompleted = null)
+        public void UnloadAllLoadedScenes(Action onCompleted = null)
         {
             for (int i = _loadedScenes.Count - 1; i >= 0; i--)
             {
                 if (onCompleted != null && i == 0)
-                    await UnloadSceneAsync(_loadedScenes[i], onCompleted);
+                    UnloadSceneAsync(_loadedScenes[i], onCompleted);
                 else
-                    await UnloadSceneAsync(_loadedScenes[i]);
+                    UnloadSceneAsync(_loadedScenes[i]);
             }
         }
     }
